@@ -26,9 +26,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             </div>
             <h2 className="text-white text-xl font-extrabold tracking-tight">Rastreador de Vencimentos</h2>
           </div>
-          <button className="flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-5 bg-[#242a47] hover:bg-[#2d3558] text-white text-sm font-bold transition-colors">
-            <span className="truncate">Suporte</span>
-          </button>
         </div>
       </header>
       
