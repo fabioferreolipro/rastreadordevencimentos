@@ -6,9 +6,10 @@ interface NavbarProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
   onLogout?: () => void;
+  syncStatus?: { isSyncing: boolean; error: string | null };
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onLogout }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onLogout, syncStatus }) => {
   // Verificação de segurança para a URL do avatar
   const avatarStyle = USER_AVATAR_URL 
     ? { backgroundImage: `url("${USER_AVATAR_URL}")` } 
@@ -55,6 +56,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onLogou
         </nav>
       </div>
       <div className="flex items-center gap-6">
+        {syncStatus?.isSyncing && (
+          <div className="hidden sm:flex items-center gap-2 text-text-muted text-xs font-bold">
+            <span className="material-symbols-outlined text-base animate-spin">sync</span>
+            <span>Sincronizando</span>
+          </div>
+        )}
+        {syncStatus?.error && (
+          <div className="hidden sm:flex items-center gap-2 text-danger text-xs font-bold" title={syncStatus.error}>
+            <span className="material-symbols-outlined text-base">error</span>
+            <span>Falha</span>
+          </div>
+        )}
         <div className="hidden sm:flex items-center min-w-40 h-10 max-w-64 relative">
            <span className="material-symbols-outlined absolute left-3 text-text-muted text-lg">search</span>
            <input 

@@ -1,5 +1,7 @@
 import { Bill, BillStatus, AuditLog } from './types';
 
+const parseYmdSafe = (value: string) => new Date(value.slice(0, 10) + 'T12:00:00');
+
 /**
  * Serviço de lógica financeira e auditoria aprimorado
  */
@@ -11,7 +13,7 @@ export const FinanceService = {
   calculateDaysDifference(dueDate: string, paymentDate: string): number {
     if (!dueDate || !paymentDate) return 0;
     
-    const due = new Date(dueDate + 'T00:00:00');
+    const due = parseYmdSafe(dueDate);
     const payment = new Date(paymentDate);
     
     if (isNaN(due.getTime()) || isNaN(payment.getTime())) return 0;
@@ -32,7 +34,7 @@ export const FinanceService = {
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const due = new Date(dueDate + 'T00:00:00');
+    const due = parseYmdSafe(dueDate);
     
     if (isNaN(due.getTime())) return 0;
     due.setHours(0, 0, 0, 0);
@@ -89,7 +91,7 @@ export const FinanceService = {
    * Valida se a data de pagamento é posterior à emissão
    */
   validatePaymentDate(issueDate: string, paymentDate: string): boolean {
-    const issue = new Date(issueDate + 'T00:00:00');
+    const issue = parseYmdSafe(issueDate);
     const payment = new Date(paymentDate);
     
     if (isNaN(issue.getTime()) || isNaN(payment.getTime())) return false;
@@ -105,7 +107,7 @@ export const FinanceService = {
    * Valida se o pagamento está sendo feito dentro do prazo (até o vencimento)
    */
   validatePaymentWithinDue(dueDate: string, paymentDate: string): boolean {
-    const due = new Date(dueDate + 'T00:00:00');
+    const due = parseYmdSafe(dueDate);
     const payment = new Date(paymentDate);
     
     if (isNaN(due.getTime()) || isNaN(payment.getTime())) return false;
@@ -146,7 +148,7 @@ export const FinanceService = {
   calculateNextDueDate(currentDueDate: string, frequency: 'weekly' | 'monthly' | 'annual'): string {
     if (!currentDueDate) return new Date().toISOString().split('T')[0];
     
-    const date = new Date(currentDueDate + 'T00:00:00');
+    const date = parseYmdSafe(currentDueDate);
     if (isNaN(date.getTime())) return new Date().toISOString().split('T')[0];
     
     switch (frequency) {

@@ -16,6 +16,7 @@ interface DashboardViewProps {
   onNavigate: (view: any) => void;
   onManageCategories: () => void;
   onLogout?: () => void;
+  syncStatus?: { isSyncing: boolean; error: string | null };
 }
 
 type SortConfig = {
@@ -47,7 +48,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onTogglePayBill, 
   onNavigate,
   onManageCategories,
-  onLogout
+  onLogout,
+  syncStatus
 }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   
@@ -66,7 +68,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const filteredByDateBills = useMemo(() => {
     return safeBills.filter(bill => {
       if (!bill.dueDate) return false;
-      const date = new Date(bill.dueDate + 'T00:00:00');
+      const date = new Date(bill.dueDate.slice(0, 10) + 'T12:00:00');
       return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
     });
   }, [safeBills, selectedMonth, selectedYear]);
@@ -135,8 +137,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '---';
     try {
-      // Se já for uma data ISO completa ou tiver timezone, não adiciona T00:00:00
-      const date = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
+      // Se já for uma data ISO completa ou tiver timezone, não ajusta a hora
+      const date = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr.slice(0, 10) + 'T12:00:00');
       if (isNaN(date.getTime())) return dateStr;
       return date.toLocaleDateString('pt-BR');
     } catch (e) {
@@ -165,7 +167,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="min-h-screen bg-background-dark text-white font-display">
-      <Navbar currentView="dashboard" onNavigate={onNavigate} onLogout={onLogout} />
+      <Navbar currentView="dashboard" onNavigate={onNavigate} onLogout={onLogout} syncStatus={syncStatus} />
 
       <main className="flex-1 px-4 md:px-20 py-8 max-w-[1400px] mx-auto w-full">
         {/* Alertas de Vencimento Crítico */}
@@ -465,5 +467,3 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     </div>
   );
 };
-
-

@@ -20,13 +20,15 @@ interface ReportsViewProps {
   categories: Category[];
   onNavigate: (view: any) => void;
   onLogout?: () => void;
+  syncStatus?: { isSyncing: boolean; error: string | null };
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ 
   bills = [], 
   categories = [], 
   onNavigate,
-  onLogout
+  onLogout,
+  syncStatus
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'recurring' | 'one-time'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
@@ -66,7 +68,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '---';
     try {
-      const date = new Date(dateStr + 'T00:00:00');
+      const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      const date = new Date(datePart.slice(0, 10) + 'T12:00:00');
       return date.toLocaleDateString('pt-BR');
     } catch (e) {
       return dateStr;
@@ -82,7 +85,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   return (
     <div className="flex h-screen flex-col bg-background-dark text-white font-display overflow-hidden">
-      <Navbar currentView="reports" onNavigate={onNavigate} onLogout={onLogout} />
+       <Navbar currentView="reports" onNavigate={onNavigate} onLogout={onLogout} syncStatus={syncStatus} />
 
       <main className="flex-1 overflow-y-auto p-4 md:p-10 lg:p-12 w-full max-w-[1600px] mx-auto flex flex-col gap-8">
         {/* Header Section */}

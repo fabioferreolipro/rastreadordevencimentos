@@ -87,7 +87,7 @@ export const AnalyticsService = {
     // Distribuição por Categoria
     const categoryMap = new Map<string, { amount: number, count: number }>();
     bills.forEach(b => {
-      const cat = b.category || 'outros';
+      const cat = b.category || 'sem_categoria';
       const current = categoryMap.get(cat) || { amount: 0, count: 0 };
       categoryMap.set(cat, {
         amount: current.amount + (b.amount || 0),

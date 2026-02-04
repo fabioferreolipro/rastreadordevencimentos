@@ -9,23 +9,37 @@ import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { ViewState, Bill, Category } from './types';
 import { MOCK_BILLS, DEFAULT_CATEGORIES } from './constants';
 import { FinanceService } from './financeService';
+import { PocketBaseCollections, PocketBaseService } from './pocketbaseService';
+
+export const resolveInitialView = (hashValue: string, savedValue: string | null): ViewState => {
+  const saved = savedValue as ViewState | null;
+  const hash = hashValue.replace('#', '') as ViewState;
+  const validViews: ViewState[] = ['login', 'dashboard', 'calendar', 'reports', 'trash'];
+  if (validViews.includes(hash)) return hash;
+  if (saved && validViews.includes(saved)) return saved;
+  return 'login';
+};
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewState>(() => {
     const saved = localStorage.getItem('app_current_view');
-    // If we have a hash, it takes priority over localStorage
-    const hash = window.location.hash.replace('#', '') as ViewState;
-    const validViews: ViewState[] = ['login', 'dashboard', 'calendar', 'reports', 'trash'];
-    if (validViews.includes(hash)) return hash;
-    return (saved as ViewState) || 'login';
+    return resolveInitialView(window.location.hash, saved);
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('app_is_authenticated') === 'true';
+  const [authToken, setAuthToken] = useState<string>(() => {
+    return PocketBaseService.getAuthState()?.token || '';
   });
+
+  const [authUserId, setAuthUserId] = useState<string>(() => {
+    return PocketBaseService.getAuthState()?.record?.id || '';
+  });
+
+  const isAuthenticated = Boolean(authToken);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const [bills, setBills] = useState<Bill[]>(() => {
     const saved = localStorage.getItem('app_bills');
@@ -53,10 +67,6 @@ export default function App() {
   }, [currentView]);
 
   useEffect(() => {
-    localStorage.setItem('app_is_authenticated', String(isAuthenticated));
-  }, [isAuthenticated]);
-
-  useEffect(() => {
     localStorage.setItem('app_bills', JSON.stringify(bills));
   }, [bills]);
 
@@ -82,6 +92,90 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  useEffect(() => {
+    const existing = PocketBaseService.getAuthState();
+    if (!existing?.token) return;
+    PocketBaseService.authRefresh(existing.token)
+      .then((refreshed) => {
+        setAuthToken(refreshed.token);
+        setAuthUserId(refreshed.record.id);
+      })
+      .catch(() => {
+        PocketBaseService.clearAuthState();
+        setAuthToken('');
+        setAuthUserId('');
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authToken) return;
+
+    const cacheRead = <T,>(key: string): { ts: number; data: T } | null => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw) as { ts: number; data: T };
+      } catch {
+        return null;
+      }
+    };
+
+    const cacheWrite = (key: string, data: unknown) => {
+      localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+    };
+
+    const CATEGORIES_CACHE_KEY = 'pb_cache_categories_v1';
+    const BILLS_CACHE_KEY = 'pb_cache_bills_v1';
+    const TTL_MS = 60_000;
+
+    const cachedCategories = cacheRead<Category[]>(CATEGORIES_CACHE_KEY);
+    if (cachedCategories?.data?.length && Date.now() - cachedCategories.ts < TTL_MS) {
+      setCategories(cachedCategories.data);
+    }
+
+    const cachedBills = cacheRead<Bill[]>(BILLS_CACHE_KEY);
+    if (cachedBills?.data?.length && Date.now() - cachedBills.ts < TTL_MS) {
+      setBills(cachedBills.data);
+    }
+
+    setIsSyncing(true);
+    setSyncError(null);
+
+    Promise.all([
+      PocketBaseService.listRecords<Category>(authToken, PocketBaseCollections.categories, {
+        page: 1,
+        perPage: 200,
+        sort: '-created',
+        fields: 'id,name,color,icon,userId'
+      }),
+      PocketBaseService.listRecords<Bill>(authToken, PocketBaseCollections.bills, {
+        page: 1,
+        perPage: 500,
+        sort: '-created',
+        filter: 'isTrashed = false',
+        fields: 'id,name,amount,paidAmount,issueDate,dueDate,paymentDate,paymentMethod,exactPaymentTimestamp,delayDays,status,isRecurring,frequency,category,notes,userId,receiptId,isTrashed,trashedAt'
+      }),
+      PocketBaseService.listRecords<Bill>(authToken, PocketBaseCollections.bills, {
+        page: 1,
+        perPage: 500,
+        sort: '-created',
+        filter: 'isTrashed = true',
+        fields: 'id,name,amount,paidAmount,issueDate,dueDate,paymentDate,paymentMethod,exactPaymentTimestamp,delayDays,status,isRecurring,frequency,category,notes,userId,receiptId,isTrashed,trashedAt'
+      })
+    ])
+      .then(([cats, billsResp, trashedResp]) => {
+        setCategories(cats.items as Category[]);
+        setBills(billsResp.items as Bill[]);
+        setDeletedBills(trashedResp.items as Bill[]);
+        cacheWrite(CATEGORIES_CACHE_KEY, cats.items);
+        cacheWrite(BILLS_CACHE_KEY, billsResp.items);
+      })
+      .catch((err: any) => {
+        setSyncError(err?.message || 'Falha ao sincronizar com o PocketBase.');
+      })
+      .finally(() => setIsSyncing(false));
+  }, [isAuthenticated, authToken]);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isAuthenticated && currentView !== 'login') {
@@ -91,13 +185,17 @@ export default function App() {
     }
   }, [isAuthenticated]);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
+  const handleLogin = async (identity: string, password: string) => {
+    const auth = await PocketBaseService.authWithPassword(identity, password);
+    setAuthToken(auth.token);
+    setAuthUserId(auth.record.id);
     setCurrentView('dashboard');
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
+    PocketBaseService.clearAuthState();
+    setAuthToken('');
+    setAuthUserId('');
     setCurrentView('login');
   };
 
@@ -113,16 +211,39 @@ export default function App() {
 
   const handleSaveBill = (billData: Partial<Bill>) => {
     if (editingBill) {
-      // Update existing bill
+      const prevBills = bills;
       setBills(prev => prev.map(b => b.id === editingBill.id ? { ...b, ...billData } as Bill : b));
+
+      if (isAuthenticated && authToken) {
+        PocketBaseService.updateRecord(authToken, PocketBaseCollections.bills, editingBill.id, {
+          ...billData,
+          userId: authUserId
+        }).catch(() => {
+          setBills(prevBills);
+        });
+      }
     } else {
-      // Add new bill
+      const tempId = `tmp-${Math.random().toString(36).slice(2)}`;
       const newBill: Bill = {
         ...billData,
-        id: Math.random().toString(36).substr(2, 9),
-        userId: 'current-user', // Mock user
+        id: tempId,
+        userId: authUserId || 'current-user',
       } as Bill;
       setBills(prev => [...prev, newBill]);
+
+      if (isAuthenticated && authToken) {
+        PocketBaseService.createRecord<Bill>(authToken, PocketBaseCollections.bills, {
+          ...billData,
+          isTrashed: false,
+          userId: authUserId
+        })
+          .then((created) => {
+            setBills(prev => prev.map(b => b.id === tempId ? (created as any as Bill) : b));
+          })
+          .catch(() => {
+            setBills(prev => prev.filter(b => b.id !== tempId));
+          });
+      }
     }
     setIsModalOpen(false);
   };
@@ -133,6 +254,16 @@ export default function App() {
       if (billToDelete) {
         setBills(prev => prev.filter(b => b.id !== billId));
         setDeletedBills(prev => [...prev, billToDelete]);
+
+        if (isAuthenticated && authToken && !billId.startsWith('tmp-')) {
+          PocketBaseService.updateRecord(authToken, PocketBaseCollections.bills, billId, {
+            isTrashed: true,
+            trashedAt: new Date().toISOString()
+          }).catch(() => {
+            setBills(prev => [...prev, billToDelete]);
+            setDeletedBills(prev => prev.filter(b => b.id !== billId));
+          });
+        }
       }
     }
   };
@@ -142,94 +273,191 @@ export default function App() {
     if (billToRestore) {
       setDeletedBills(prev => prev.filter(b => b.id !== billId));
       setBills(prev => [...prev, billToRestore]);
+
+      if (isAuthenticated && authToken && !billId.startsWith('tmp-')) {
+        PocketBaseService.updateRecord(authToken, PocketBaseCollections.bills, billId, {
+          isTrashed: false,
+          trashedAt: ''
+        }).catch(() => {
+          setBills(prev => prev.filter(b => b.id !== billId));
+          setDeletedBills(prev => [...prev, billToRestore]);
+        });
+      }
     }
   };
 
   const handlePermanentDelete = (billId: string) => {
     if (confirm('Tem certeza que deseja excluir permanentemente esta conta? Esta ação não pode ser desfeita.')) {
+      const billToDelete = deletedBills.find(b => b.id === billId);
       setDeletedBills(prev => prev.filter(b => b.id !== billId));
+
+      if (isAuthenticated && authToken && billToDelete && !billId.startsWith('tmp-')) {
+        PocketBaseService.deleteRecord(authToken, PocketBaseCollections.bills, billId).catch(() => {
+          setDeletedBills(prev => [...prev, billToDelete]);
+        });
+      }
     }
   };
 
   const handleAddCategory = (category: Category) => {
-    setCategories(prev => [...prev, category]);
+    const tempId = category.id.startsWith('tmp-') ? category.id : `tmp-${category.id}`;
+    const optimistic: Category = { ...category, id: tempId };
+    setCategories(prev => [...prev, optimistic]);
+
+    if (isAuthenticated && authToken) {
+      PocketBaseService.createRecord<Category>(authToken, PocketBaseCollections.categories, {
+        name: category.name,
+        color: category.color,
+        icon: (category as any).icon,
+        userId: authUserId
+      })
+        .then((created) => {
+          setCategories(prev => prev.map(c => c.id === tempId ? (created as any as Category) : c));
+        })
+        .catch(() => {
+          setCategories(prev => prev.filter(c => c.id !== tempId));
+        });
+    }
   };
 
   const handleEditCategory = (category: Category) => {
-    setCategories(prev => prev.map(c => c.id === category.id ? category : c));
+    const prev = categories;
+    setCategories(prevState => prevState.map(c => c.id === category.id ? category : c));
+
+    if (isAuthenticated && authToken && !category.id.startsWith('tmp-')) {
+      PocketBaseService.updateRecord<Category>(authToken, PocketBaseCollections.categories, category.id, {
+        name: category.name,
+        color: category.color,
+        icon: (category as any).icon
+      }).catch(() => {
+        setCategories(prev);
+      });
+    }
   };
 
   const handleDeleteCategory = (categoryId: string) => {
     if (confirm('Tem certeza que deseja excluir esta categoria? As contas vinculadas ficarão sem categoria.')) {
+      const prevCategories = categories;
+      const prevBills = bills;
       setCategories(prev => prev.filter(c => c.id !== categoryId));
-      setBills(prev => prev.map(b => b.category === categoryId ? { ...b, category: 'outros' } : b));
+      setBills(prev => prev.map(b => b.category === categoryId ? { ...b, category: undefined } as Bill : b));
+
+      if (isAuthenticated && authToken && !categoryId.startsWith('tmp-')) {
+        (async () => {
+          try {
+            const affected = prevBills.filter(b => b.category === categoryId && !b.id.startsWith('tmp-'));
+            for (const bill of affected) {
+              await PocketBaseService.updateRecord(authToken, PocketBaseCollections.bills, bill.id, { category: '' });
+            }
+            await PocketBaseService.deleteRecord(authToken, PocketBaseCollections.categories, categoryId);
+          } catch {
+            setCategories(prevCategories);
+            setBills(prevBills);
+          }
+        })();
+      }
     }
   };
 
   const handleEmptyTrash = () => {
     if (confirm('Tem certeza que deseja esvaziar a lixeira? Todos os registros serão perdidos permanentemente.')) {
+      const prev = deletedBills;
       setDeletedBills([]);
+
+      if (isAuthenticated && authToken) {
+        (async () => {
+          for (const bill of prev) {
+            if (bill.id.startsWith('tmp-')) continue;
+            try {
+              await PocketBaseService.deleteRecord(authToken, PocketBaseCollections.bills, bill.id);
+            } catch {
+              setDeletedBills(current => current.some(b => b.id === bill.id) ? current : [...current, bill]);
+            }
+          }
+        })();
+      }
     }
   };
 
   const handleTogglePayBill = (billId: string) => {
-    setBills(prev => {
-      const bill = prev.find(b => b.id === billId);
-      if (!bill) return prev;
+    const bill = bills.find(b => b.id === billId);
+    if (!bill) return;
 
-      const isUnpaying = bill.status === 'paid' || bill.status === 'early' || bill.status === 'on_time' || bill.status === 'paid_partial';
+    const isUnpaying = bill.status === 'paid' || bill.status === 'early' || bill.status === 'on_time' || bill.status === 'paid_partial';
 
-      if (isUnpaying) {
-        // Revert to unpaid state
-        return prev.map(b => 
-          b.id === billId 
-            ? { 
-                ...b, 
-                status: FinanceService.determineStatus({ ...b, paymentDate: undefined }), 
-                paymentDate: undefined,
-                paidAmount: undefined,
-                receiptId: undefined,
-                exactPaymentTimestamp: undefined
-              } as Bill 
-            : b
-        );
-      } else {
-        // Mark as paid
-        const paymentDate = new Date().toISOString();
-        const updatedBills = prev.map(b => 
-          b.id === billId 
-            ? { 
-                ...b, 
-                status: 'paid', 
-                paymentDate,
-                delayDays: FinanceService.calculateDaysDifference(b.dueDate, paymentDate)
-              } as Bill 
-            : b
-        );
+    let updatedBill: Bill;
+    let nextBill: Bill | null = null;
 
-        // Lógica de recorrência
-        if (bill.isRecurring && bill.frequency) {
-          const nextDueDate = FinanceService.calculateNextDueDate(bill.dueDate, bill.frequency);
-          const alreadyExists = prev.some(b => b.name === bill.name && b.dueDate === nextDueDate);
-          
-          if (!alreadyExists) {
-            const nextBill: Bill = {
-              ...bill,
-              id: Math.random().toString(36).substr(2, 9),
-              dueDate: nextDueDate,
-              status: 'pending',
-              paymentDate: undefined,
-              paidAmount: undefined,
-              receiptId: undefined,
-              exactPaymentTimestamp: undefined,
-              delayDays: 0,
-            };
-            return [...updatedBills, nextBill];
-          }
+    if (isUnpaying) {
+      updatedBill = {
+        ...bill,
+        status: FinanceService.determineStatus({ ...bill, paymentDate: undefined }),
+        paymentDate: undefined,
+        paidAmount: undefined,
+        receiptId: undefined,
+        exactPaymentTimestamp: undefined
+      } as Bill;
+    } else {
+      const paymentDate = new Date().toISOString();
+      updatedBill = {
+        ...bill,
+        status: 'paid',
+        paymentDate,
+        delayDays: FinanceService.calculateDaysDifference(bill.dueDate, paymentDate)
+      } as Bill;
+
+      if (bill.isRecurring && bill.frequency) {
+        const nextDueDate = FinanceService.calculateNextDueDate(bill.dueDate, bill.frequency);
+        const alreadyExists = bills.some(b => b.name === bill.name && b.dueDate === nextDueDate && b.userId === bill.userId);
+        if (!alreadyExists) {
+          nextBill = {
+            ...bill,
+            id: `tmp-${Math.random().toString(36).slice(2)}`,
+            dueDate: nextDueDate,
+            status: 'pending',
+            paymentDate: undefined,
+            paidAmount: undefined,
+            receiptId: undefined,
+            exactPaymentTimestamp: undefined,
+            delayDays: 0,
+          } as Bill;
         }
-        return updatedBills;
       }
+    }
+
+    const prevBills = bills;
+    setBills(prev => {
+      const base = prev.map(b => b.id === billId ? updatedBill : b);
+      return nextBill ? [...base, nextBill] : base;
     });
+
+    if (isAuthenticated && authToken && !billId.startsWith('tmp-')) {
+      PocketBaseService.updateRecord(authToken, PocketBaseCollections.bills, billId, {
+        status: updatedBill.status,
+        paymentDate: updatedBill.paymentDate,
+        paidAmount: updatedBill.paidAmount,
+        receiptId: updatedBill.receiptId,
+        exactPaymentTimestamp: updatedBill.exactPaymentTimestamp,
+        delayDays: updatedBill.delayDays
+      }).catch(() => {
+        setBills(prevBills);
+      });
+    }
+
+    if (nextBill && isAuthenticated && authToken) {
+      PocketBaseService.createRecord<Bill>(authToken, PocketBaseCollections.bills, {
+        ...nextBill,
+        id: undefined,
+        isTrashed: false,
+        userId: authUserId
+      })
+        .then((created) => {
+          setBills(prev => prev.map(b => b.id === nextBill!.id ? (created as any as Bill) : b));
+        })
+        .catch(() => {
+          setBills(prev => prev.filter(b => b.id !== nextBill!.id));
+        });
+    }
   };
 
   const handleNavigate = (view: ViewState) => {
@@ -260,6 +488,7 @@ export default function App() {
             onNavigate={handleNavigate}
             onManageCategories={() => setIsCategoryModalOpen(true)}
             onLogout={handleLogout}
+            syncStatus={{ isSyncing, error: syncError }}
           />
         )}
         
@@ -274,6 +503,7 @@ export default function App() {
             onNavigate={handleNavigate}
             onManageCategories={() => setIsCategoryModalOpen(true)}
             onLogout={handleLogout}
+            syncStatus={{ isSyncing, error: syncError }}
           />
         )}
 
@@ -283,6 +513,7 @@ export default function App() {
             categories={categories}
             onNavigate={handleNavigate}
             onLogout={handleLogout}
+            syncStatus={{ isSyncing, error: syncError }}
           />
         )}
 
@@ -294,6 +525,7 @@ export default function App() {
             onEmptyTrash={handleEmptyTrash}
             onNavigate={handleNavigate}
             onLogout={handleLogout}
+            syncStatus={{ isSyncing, error: syncError }}
           />
         )}
 

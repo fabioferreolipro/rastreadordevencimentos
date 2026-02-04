@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
 
 interface LoginViewProps {
-  onLogin: () => void;
+  onLogin: (identity: string, password: string) => Promise<void> | void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [identity, setIdentity] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await onLogin(identity.trim(), password);
+    } catch (err: any) {
+      setError(err?.message || 'Falha no login.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -50,9 +62,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               <div className="relative">
                 <input 
                   type="email" 
-                  defaultValue="demo@exemplo.com"
+                  value={identity}
+                  onChange={(e) => setIdentity(e.target.value)}
                   className="w-full h-14 bg-[#1a1e32]/80 border border-border-dark rounded-xl px-4 text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" 
                   placeholder="seu@email.com" 
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -64,9 +78,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               <div className="relative flex items-center">
                 <input 
                   type={showPassword ? "text" : "password"} 
-                  defaultValue="123456"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full h-14 bg-[#1a1e32]/80 border border-border-dark rounded-xl px-4 pr-12 text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" 
                   placeholder="Digite sua senha" 
+                  autoComplete="current-password"
                 />
                 <button 
                   type="button" 
@@ -77,13 +93,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 </button>
               </div>
             </div>
+            {error && (
+              <div className="bg-danger/15 border border-danger/40 text-danger text-sm font-semibold rounded-xl px-4 py-3">
+                {error}
+              </div>
+            )}
+
             <button 
-            type="submit" 
-            className="w-full h-14 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-4 active:scale-[0.98]"
-          >
-            <span>Entrar</span>
-            <span className="material-symbols-outlined !text-lg">arrow_forward</span>
-          </button>
+              type="submit" 
+              disabled={isSubmitting}
+              className="w-full h-14 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-4 active:scale-[0.98]"
+            >
+              <span>{isSubmitting ? 'Entrando...' : 'Entrar'}</span>
+              {!isSubmitting && <span className="material-symbols-outlined !text-lg">arrow_forward</span>}
+            </button>
         </form>
 
           <div className="mt-8 text-center">

@@ -9,6 +9,7 @@ interface TrashViewProps {
   onEmptyTrash: () => void;
   onNavigate: (view: any) => void;
   onLogout?: () => void;
+  syncStatus?: { isSyncing: boolean; error: string | null };
 }
 
 export const TrashView: React.FC<TrashViewProps> = ({ 
@@ -17,12 +18,14 @@ export const TrashView: React.FC<TrashViewProps> = ({
   onPermanentDelete, 
   onEmptyTrash,
   onNavigate,
-  onLogout
+  onLogout,
+  syncStatus
 }) => {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '---';
     try {
-      const date = new Date(dateStr + 'T00:00:00');
+      const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      const date = new Date(datePart.slice(0, 10) + 'T12:00:00');
       if (isNaN(date.getTime())) return dateStr;
       return date.toLocaleDateString('pt-BR');
     } catch (e) {
@@ -32,7 +35,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
 
   return (
     <div className="flex h-screen flex-col bg-background-dark text-white font-display">
-      <Navbar currentView="trash" onNavigate={onNavigate} onLogout={onLogout} />
+      <Navbar currentView="trash" onNavigate={onNavigate} onLogout={onLogout} syncStatus={syncStatus} />
 
       <main className="flex-1 overflow-auto p-4 md:p-20 w-full max-w-[1400px] mx-auto flex flex-col gap-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -134,4 +137,3 @@ export const TrashView: React.FC<TrashViewProps> = ({
     </div>
   );
 };
-

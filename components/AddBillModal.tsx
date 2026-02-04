@@ -28,7 +28,7 @@ export const AddBillModal: React.FC<AddBillModalProps> = ({
   const [dueDate, setDueDate] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
-  const [category, setCategory] = useState<string>('outros');
+  const [category, setCategory] = useState<string>('');
   const [isRecurring, setIsRecurring] = useState(true);
   const [frequency, setFrequency] = useState<'weekly' | 'monthly' | 'annual'>('monthly');
   const [notes, setNotes] = useState('');
@@ -74,7 +74,7 @@ export const AddBillModal: React.FC<AddBillModalProps> = ({
       setDueDate(initialData?.dueDate?.split('T')[0] || '');
       setPaymentDate(initialData?.paymentDate?.split('T')[0] || '');
       setPaymentMethod(initialData?.paymentMethod || 'pix');
-      setCategory(initialData?.category || 'outros');
+      setCategory(initialData?.category || '');
       setIsRecurring(initialData?.isRecurring ?? true);
       setFrequency(initialData?.frequency || 'monthly');
       setNotes(initialData?.notes || '');
@@ -117,7 +117,7 @@ export const AddBillModal: React.FC<AddBillModalProps> = ({
       dueDate,
       paymentDate: paymentDate || undefined,
       paymentMethod: paymentDate ? paymentMethod : undefined,
-      category,
+      category: category || undefined,
       delayDays: paymentDate ? FinanceService.calculateDaysDifference(dueDate, paymentDate) : 0,
       exactPaymentTimestamp: paymentDate ? new Date().toISOString() : undefined,
       receiptId: paymentDate ? FinanceService.generateReceiptId() : undefined,
@@ -198,12 +198,10 @@ export const AddBillModal: React.FC<AddBillModalProps> = ({
                   onKeyDown={(e) => handleKeyDown(e, issueDateRef)}
                   className="h-14 bg-card-dark border border-border-dark rounded-xl px-4 text-white focus:border-primary appearance-none cursor-pointer"
                 >
+                  <option value="">Outros</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
-                  {!categories.find(c => c.id === 'outros') && (
-                    <option value="outros">Outros</option>
-                  )}
                 </select>
               </label>
             </div>

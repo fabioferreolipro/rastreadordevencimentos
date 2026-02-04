@@ -17,6 +17,7 @@ interface CalendarViewProps {
   onNavigate: (view: any) => void;
   onManageCategories: () => void;
   onLogout?: () => void;
+  syncStatus?: { isSyncing: boolean; error: string | null };
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ 
@@ -28,7 +29,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onTogglePayBill, 
   onNavigate,
   onManageCategories,
-  onLogout
+  onLogout,
+  syncStatus
 }) => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -359,7 +361,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   return (
     <div className="flex h-screen flex-col bg-background-dark text-white font-display">
-      <Navbar currentView="calendar" onNavigate={onNavigate} onLogout={onLogout} />
+      <Navbar currentView="calendar" onNavigate={onNavigate} onLogout={onLogout} syncStatus={syncStatus} />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">

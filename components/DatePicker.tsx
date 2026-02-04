@@ -14,7 +14,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, onEnter
   const [isOpen, setIsOpen] = useState(false);
   const [isPositioned, setIsPositioned] = useState(false);
   const [localInputValue, setLocalInputValue] = useState('');
-  const [viewDate, setViewDate] = useState(value ? new Date(value + 'T00:00:00') : new Date());
+  const [viewDate, setViewDate] = useState(value ? new Date(value.slice(0, 10) + 'T12:00:00') : new Date());
   const [dropUp, setDropUp] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,7 +89,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, onEnter
     if (value) {
       setLocalInputValue(formatDateDisplay(value));
       const datePart = value.split('T')[0];
-      const newDate = new Date(datePart + 'T00:00:00');
+      const newDate = new Date(datePart + 'T12:00:00');
       if (!isNaN(newDate.getTime())) {
         setViewDate(newDate);
       }
