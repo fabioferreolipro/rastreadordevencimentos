@@ -1,7 +1,7 @@
 import { Bill, Category } from './types';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -39,20 +39,38 @@ export const ReportExportService = {
     document.body.removeChild(link);
   },
 
-  exportToExcel(bills: Bill[], categories: Category[], fileName: string = 'relatorio-contas.xlsx') {
-    const data = bills.map(b => ({
-      Vencimento: b.dueDate,
-      Nome: b.name,
-      Valor: b.amount,
-      Status: b.status,
-      Recorrente: b.isRecurring ? 'Sim' : 'Não',
-      Categoria: this.getCategoryName(b.category, categories)
-    }));
+  async exportToExcel(bills: Bill[], categories: Category[], fileName: string = 'relatorio-contas.xlsx') {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Contas');
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Contas');
-    XLSX.writeFile(workbook, fileName);
+    worksheet.columns = [
+      { header: 'Vencimento', key: 'dueDate', width: 15 },
+      { header: 'Nome', key: 'name', width: 30 },
+      { header: 'Valor', key: 'amount', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Recorrente', key: 'isRecurring', width: 15 },
+      { header: 'Categoria', key: 'category', width: 20 }
+    ];
+
+    bills.forEach(b => {
+      worksheet.addRow({
+        dueDate: b.dueDate,
+        name: b.name,
+        amount: b.amount,
+        status: b.status,
+        isRecurring: b.isRecurring ? 'Sim' : 'Não',
+        category: this.getCategoryName(b.category, categories)
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
   },
 
   exportToPDF(bills: Bill[], categories: Category[], fileName: string = 'relatorio-contas.pdf') {

@@ -213,10 +213,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
           </div>
         </div>
       </main>
-      
-      <footer className="w-full py-6 text-center">
-        <p className="text-text-muted/50 text-xs">© 2026 Rastreador de Vencimentos - Controle Financeiro Inteligente</p>
-      </footer>
     </div>
   );
 };
