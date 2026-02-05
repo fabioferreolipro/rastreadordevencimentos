@@ -192,6 +192,14 @@ export default function App() {
     setCurrentView('dashboard');
   };
 
+  const handleRegister = async (email: string, password: string, passwordConfirm: string) => {
+    await PocketBaseService.createUser(email, password, passwordConfirm);
+  };
+
+  const handleForgotPassword = async (email: string) => {
+    await PocketBaseService.requestPasswordReset(email);
+  };
+
   const handleLogout = () => {
     PocketBaseService.clearAuthState();
     setAuthToken('');
@@ -475,7 +483,13 @@ export default function App() {
   try {
     return (
       <>
-        {currentView === 'login' && <LoginView onLogin={handleLogin} />}
+        {currentView === 'login' && (
+          <LoginView 
+            onLogin={handleLogin} 
+            onRegister={handleRegister}
+            onForgotPassword={handleForgotPassword}
+          />
+        )}
         
         {currentView === 'dashboard' && (
           <DashboardView 

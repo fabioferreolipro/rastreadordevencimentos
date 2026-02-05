@@ -103,6 +103,41 @@ export const PocketBaseService = {
     return state;
   },
 
+  async createUser(email: string, password: string, passwordConfirm: string): Promise<any> {
+    const resp = await fetch(`${PB_BASE_URL}/api/collections/${PocketBaseCollections.users}/records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        passwordConfirm,
+        emailVisibility: true
+      })
+    });
+
+    const data = await safeJson<any>(resp);
+    if (!resp.ok || !data?.id) {
+      const details = data?.message || data?.data || resp.statusText;
+      throw new Error(`Falha ao criar conta: HTTP ${resp.status} - ${String(JSON.stringify(details))}`);
+    }
+
+    return data;
+  },
+
+  async requestPasswordReset(email: string): Promise<void> {
+    const resp = await fetch(`${PB_BASE_URL}/api/collections/${PocketBaseCollections.users}/request-password-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    if (!resp.ok) {
+      const data = await safeJson<any>(resp);
+      const details = data?.message || data?.data || resp.statusText;
+      throw new Error(`Falha ao solicitar recuperação: HTTP ${resp.status} - ${String(JSON.stringify(details))}`);
+    }
+  },
+
   async listRecords<T>(
     token: string,
     collection: string,

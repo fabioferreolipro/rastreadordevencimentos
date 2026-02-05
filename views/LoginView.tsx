@@ -2,26 +2,68 @@ import React, { useState } from 'react';
 
 interface LoginViewProps {
   onLogin: (identity: string, password: string) => Promise<void> | void;
+  onRegister: (email: string, password: string, passwordConfirm: string) => Promise<void> | void;
+  onForgotPassword: (email: string) => Promise<void> | void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
+type AuthMode = 'login' | 'register' | 'forgot_password';
+
+export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPassword }) => {
+  const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setIsSubmitting(true);
     try {
-      await onLogin(identity.trim(), password);
+      if (mode === 'login') {
+        await onLogin(identity.trim(), password);
+      } else if (mode === 'register') {
+        if (password !== passwordConfirm) {
+          throw new Error('As senhas não coincidem.');
+        }
+        await onRegister(identity.trim(), password, passwordConfirm);
+        setSuccess('Conta criada com sucesso! Agora você pode fazer login.');
+        setMode('login');
+        setPassword('');
+        setPasswordConfirm('');
+      } else if (mode === 'forgot_password') {
+        await onForgotPassword(identity.trim());
+        setSuccess('E-mail de recuperação enviado com sucesso!');
+        setMode('login');
+      }
     } catch (err: any) {
-      setError(err?.message || 'Falha no login.');
+      setError(err?.message || 'Ocorreu um erro.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getTitle = () => {
+    if (mode === 'login') return 'Bem-vindo de volta';
+    if (mode === 'register') return 'Criar nova conta';
+    return 'Recuperar senha';
+  };
+
+  const getSubtitle = () => {
+    if (mode === 'login') return 'Acesse sua conta para gerenciar seus vencimentos';
+    if (mode === 'register') return 'Cadastre-se para começar a controlar suas finanças';
+    return 'Informe seu e-mail para receber as instruções';
+  };
+
+  const getButtonLabel = () => {
+    if (isSubmitting) return mode === 'login' ? 'Entrando...' : mode === 'register' ? 'Criando conta...' : 'Enviando...';
+    if (mode === 'login') return 'Entrar';
+    if (mode === 'register') return 'Criar conta';
+    return 'Enviar link';
   };
 
   return (
@@ -52,8 +94,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             <div className="size-12 mb-4 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
               <span className="material-symbols-outlined !text-3xl">account_balance_wallet</span>
             </div>
-            <h1 className="text-white text-2xl md:text-3xl font-extrabold tracking-tight text-center">Bem-vindo de volta</h1>
-            <p className="text-text-muted text-sm mt-2 text-center">Acesse sua conta para gerenciar seus vencimentos</p>
+            <h1 className="text-white text-2xl md:text-3xl font-extrabold tracking-tight text-center">{getTitle()}</h1>
+            <p className="text-text-muted text-sm mt-2 text-center">{getSubtitle()}</p>
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
@@ -62,6 +104,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               <div className="relative">
                 <input 
                   type="email" 
+                  required
                   value={identity}
                   onChange={(e) => setIdentity(e.target.value)}
                   className="w-full h-14 bg-[#1a1e32]/80 border border-border-dark rounded-xl px-4 text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" 
@@ -70,32 +113,68 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-white text-sm font-semibold">Senha</label>
-                <a href="#" className="text-primary text-xs font-semibold hover:underline">Esqueci minha senha</a>
+
+            {mode !== 'forgot_password' && (
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-white text-sm font-semibold">Senha</label>
+                  {mode === 'login' && (
+                    <button 
+                      type="button"
+                      onClick={() => setMode('forgot_password')}
+                      className="text-primary text-xs font-semibold hover:underline bg-transparent border-none cursor-pointer"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  )}
+                </div>
+                <div className="relative flex items-center">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full h-14 bg-[#1a1e32]/80 border border-border-dark rounded-xl px-4 pr-12 text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" 
+                    placeholder="Digite sua senha" 
+                    autoComplete={mode === 'register' ? "new-password" : "current-password"}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 text-text-muted hover:text-white transition-colors"
+                  >
+                    <span className="material-symbols-outlined">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                </div>
               </div>
-              <div className="relative flex items-center">
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-14 bg-[#1a1e32]/80 border border-border-dark rounded-xl px-4 pr-12 text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" 
-                  placeholder="Digite sua senha" 
-                  autoComplete="current-password"
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 text-text-muted hover:text-white transition-colors"
-                >
-                  <span className="material-symbols-outlined">{showPassword ? 'visibility_off' : 'visibility'}</span>
-                </button>
+            )}
+
+            {mode === 'register' && (
+              <div className="flex flex-col gap-2">
+                <label className="text-white text-sm font-semibold px-1">Confirmar Senha</label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    required
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    className="w-full h-14 bg-[#1a1e32]/80 border border-border-dark rounded-xl px-4 text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" 
+                    placeholder="Confirme sua senha" 
+                    autoComplete="new-password"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
             {error && (
               <div className="bg-danger/15 border border-danger/40 text-danger text-sm font-semibold rounded-xl px-4 py-3">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-success/15 border border-success/40 text-success text-sm font-semibold rounded-xl px-4 py-3">
+                {success}
               </div>
             )}
 
@@ -104,16 +183,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               disabled={isSubmitting}
               className="w-full h-14 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-4 active:scale-[0.98]"
             >
-              <span>{isSubmitting ? 'Entrando...' : 'Entrar'}</span>
+              <span>{getButtonLabel()}</span>
               {!isSubmitting && <span className="material-symbols-outlined !text-lg">arrow_forward</span>}
             </button>
+
+            {mode !== 'login' && (
+              <button 
+                type="button"
+                onClick={() => setMode('login')}
+                className="w-full text-text-muted text-sm font-medium hover:text-white transition-colors mt-2"
+              >
+                Voltar para o login
+              </button>
+            )}
         </form>
 
           <div className="mt-8 text-center">
-            <p className="text-text-muted text-sm font-medium">
-              Ainda não tem uma conta?
-              <a href="#" className="text-primary hover:underline font-bold ml-1">Criar uma conta</a>
-            </p>
+            {mode === 'login' && (
+              <p className="text-text-muted text-sm font-medium">
+                Ainda não tem uma conta?
+                <button 
+                  onClick={() => setMode('register')}
+                  className="text-primary hover:underline font-bold ml-1 bg-transparent border-none cursor-pointer"
+                >
+                  Criar uma conta
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </main>
