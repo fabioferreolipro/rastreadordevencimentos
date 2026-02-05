@@ -25,7 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onLogou
           <div className="size-8 bg-primary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
             <span className="material-symbols-outlined text-white text-xl">account_balance_wallet</span>
           </div>
-          <h2 className="text-white text-lg font-bold leading-tight tracking-tight">Rastreador de Vencimentos</h2>
+          <h2 className="text-white text-lg font-bold leading-tight tracking-tight uppercase">Rastreador de Vencimentos</h2>
         </div>
         <nav className="hidden md:flex items-center gap-9">
           <button 
