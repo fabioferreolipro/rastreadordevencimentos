@@ -111,6 +111,7 @@ export const PocketBaseService = {
         email,
         password,
         passwordConfirm,
+        role: 'user',
         emailVisibility: true
       })
     });
