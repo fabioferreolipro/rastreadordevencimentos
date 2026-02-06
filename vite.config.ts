@@ -1,7 +1,3 @@
-export default defineConfig({
-  base: './',  // Isso garante que ele use caminhos relativos
-  // ... resto das configurações
-})
 
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
@@ -15,6 +11,7 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react()],
+      base: './', // Adicione esta linha exatamente assim
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
