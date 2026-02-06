@@ -187,6 +187,19 @@ export default function App() {
 
   const handleLogin = async (identity: string, password: string) => {
     const auth = await PocketBaseService.authWithPassword(identity, password);
+    
+    // Se o e-mail não estiver verificado, desloga e avisa (opcional, dependendo da regra de negócio)
+    // Mas como o usuário pediu "verificação de e-mail", vamos reforçar isso.
+    if (auth.record.verified === false) {
+      PocketBaseService.clearAuthState();
+      setAuthToken('');
+      setAuthUserId('');
+      const error = new Error('Seu e-mail ainda não foi verificado. Por favor, verifique sua caixa de entrada.');
+      (error as any).needsVerification = true;
+      (error as any).email = auth.record.email;
+      throw error;
+    }
+
     setAuthToken(auth.token);
     setAuthUserId(auth.record.id);
     setCurrentView('dashboard');
@@ -194,6 +207,12 @@ export default function App() {
 
   const handleRegister = async (email: string, password: string, passwordConfirm: string) => {
     await PocketBaseService.createUser(email, password, passwordConfirm);
+    // Solicita verificação imediatamente após criar a conta
+    await PocketBaseService.requestVerification(email);
+  };
+
+  const handleResendVerification = async (email: string) => {
+    await PocketBaseService.requestVerification(email);
   };
 
   const handleForgotPassword = async (email: string) => {
@@ -488,6 +507,7 @@ export default function App() {
             onLogin={handleLogin} 
             onRegister={handleRegister}
             onForgotPassword={handleForgotPassword}
+            onResendVerification={handleResendVerification}
           />
         )}
         

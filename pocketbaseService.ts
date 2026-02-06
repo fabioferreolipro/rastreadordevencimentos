@@ -2,6 +2,7 @@ export type PocketBaseAuthRecord = {
   id: string;
   email?: string;
   role?: 'admin' | 'user';
+  verified?: boolean;
 };
 
 type PocketBaseAuthState = {
@@ -123,6 +124,20 @@ export const PocketBaseService = {
     }
 
     return data;
+  },
+
+  async requestVerification(email: string): Promise<void> {
+    const resp = await fetch(`${PB_BASE_URL}/api/collections/${PocketBaseCollections.users}/request-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    if (!resp.ok) {
+      const data = await safeJson<any>(resp);
+      const details = data?.message || data?.data || resp.statusText;
+      throw new Error(`Falha ao solicitar verificação: HTTP ${resp.status} - ${String(JSON.stringify(details))}`);
+    }
   },
 
   async requestPasswordReset(email: string): Promise<void> {

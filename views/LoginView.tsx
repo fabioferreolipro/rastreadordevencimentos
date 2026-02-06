@@ -4,11 +4,12 @@ interface LoginViewProps {
   onLogin: (identity: string, password: string) => Promise<void> | void;
   onRegister: (email: string, password: string, passwordConfirm: string) => Promise<void> | void;
   onForgotPassword: (email: string) => Promise<void> | void;
+  onResendVerification: (email: string) => Promise<void> | void;
 }
 
 type AuthMode = 'login' | 'register' | 'forgot_password';
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPassword }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPassword, onResendVerification }) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [identity, setIdentity] = useState('');
@@ -17,11 +18,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [lastEmail, setLastEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setNeedsVerification(false);
     setIsSubmitting(true);
     try {
       if (mode === 'login') {
@@ -31,7 +35,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
           throw new Error('As senhas não coincidem.');
         }
         await onRegister(identity.trim(), password, passwordConfirm);
-        setSuccess('Conta criada com sucesso! Agora você pode fazer login.');
+        setSuccess('CONTA CRIADA! Enviamos um link de ativação para o seu e-mail. Você precisa confirmar seu e-mail antes de acessar o sistema.');
         setMode('login');
         setPassword('');
         setPasswordConfirm('');
@@ -42,6 +46,24 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
       }
     } catch (err: any) {
       setError(err?.message || 'Ocorreu um erro.');
+      if (err?.needsVerification) {
+        setNeedsVerification(true);
+        setLastEmail(err.email || identity.trim());
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await onResendVerification(lastEmail);
+      setSuccess('E-mail de verificação reenviado com sucesso! Verifique sua caixa de entrada.');
+      setNeedsVerification(false);
+    } catch (err: any) {
+      setError(err?.message || 'Falha ao reenviar e-mail.');
     } finally {
       setIsSubmitting(false);
     }
@@ -55,7 +77,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
 
   const getSubtitle = () => {
     if (mode === 'login') return 'Acesse sua conta para gerenciar seus vencimentos';
-    if (mode === 'register') return 'Cadastre-se para começar a controlar suas finanças';
+    if (mode === 'register') return 'Cadastre-se e verifique seu e-mail para começar';
     return 'Informe seu e-mail para receber as instruções';
   };
 
@@ -167,14 +189,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
             )}
 
             {error && (
-              <div className="bg-danger/15 border border-danger/40 text-danger text-sm font-semibold rounded-xl px-4 py-3">
-                {error}
+              <div className="bg-danger/15 border border-danger/40 text-danger text-sm font-semibold rounded-xl px-4 py-3 flex flex-col gap-2">
+                <span>{error}</span>
+                {needsVerification && (
+                  <button 
+                    type="button"
+                    onClick={handleResend}
+                    disabled={isSubmitting}
+                    className="text-left text-primary hover:underline bg-transparent border-none cursor-pointer text-xs font-bold w-fit"
+                  >
+                    {isSubmitting ? 'Reenviando...' : 'Reenviar e-mail de verificação'}
+                  </button>
+                )}
               </div>
             )}
 
             {success && (
-              <div className="bg-success/15 border border-success/40 text-success text-sm font-semibold rounded-xl px-4 py-3">
-                {success}
+              <div className="bg-success/15 border border-success/40 text-success text-sm font-semibold rounded-xl px-4 py-3 flex items-start gap-3">
+                <span className="material-symbols-outlined !text-xl mt-0.5">mark_email_read</span>
+                <span>{success}</span>
               </div>
             )}
 
