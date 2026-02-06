@@ -13,9 +13,17 @@ import { PocketBaseCollections, PocketBaseService } from './pocketbaseService';
 
 export const resolveInitialView = (hashValue: string, savedValue: string | null): ViewState => {
   const saved = savedValue as ViewState | null;
-  const hash = hashValue.replace('#', '') as ViewState;
+  const hash = hashValue.replace('#', '');
+  
+  // Se vier de um link de confirmação do PocketBase, redireciona para login com mensagem
+  if (hash.includes('/auth/confirm-verification') || hash.includes('/auth/confirm-password-reset')) {
+    return 'login';
+  }
+
   const validViews: ViewState[] = ['login', 'dashboard', 'calendar', 'reports', 'trash'];
-  if (validViews.includes(hash)) return hash;
+  const view = hash as ViewState;
+  
+  if (validViews.includes(view)) return view;
   if (saved && validViews.includes(saved)) return saved;
   return 'login';
 };
