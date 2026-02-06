@@ -140,6 +140,20 @@ export const PocketBaseService = {
     }
   },
 
+  async confirmVerification(token: string): Promise<void> {
+    const resp = await fetch(`${PB_BASE_URL}/api/collections/${PocketBaseCollections.users}/confirm-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
+    if (!resp.ok) {
+      const data = await safeJson<any>(resp);
+      const details = data?.message || data?.data || resp.statusText;
+      throw new Error(`Falha ao confirmar e-mail: HTTP ${resp.status} - ${String(JSON.stringify(details))}`);
+    }
+  },
+
   async requestPasswordReset(email: string): Promise<void> {
     const resp = await fetch(`${PB_BASE_URL}/api/collections/${PocketBaseCollections.users}/request-password-reset`, {
       method: 'POST',

@@ -138,7 +138,9 @@ async function main() {
     authOptions: {
       allowEmailAuth: true,
       requireEmail: true,
-      minPasswordLength: 8
+      minPasswordLength: 8,
+      verificationUrl: 'http://localhost:3000/#/auth/confirm-verification/',
+      resetPasswordUrl: 'http://localhost:3000/#/auth/confirm-password-reset/'
     },
     listRule: 'id = @request.auth.id',
     viewRule: 'id = @request.auth.id',

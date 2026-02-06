@@ -5,11 +5,20 @@ interface LoginViewProps {
   onRegister: (email: string, password: string, passwordConfirm: string) => Promise<void> | void;
   onForgotPassword: (email: string) => Promise<void> | void;
   onResendVerification: (email: string) => Promise<void> | void;
+  isVerifying?: boolean;
+  verificationStatus?: { success?: string; error?: string } | null;
 }
 
 type AuthMode = 'login' | 'register' | 'forgot_password';
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPassword, onResendVerification }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ 
+  onLogin, 
+  onRegister, 
+  onForgotPassword, 
+  onResendVerification,
+  isVerifying,
+  verificationStatus
+}) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [identity, setIdentity] = useState('');
@@ -201,6 +210,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onFor
                     {isSubmitting ? 'Reenviando...' : 'Reenviar e-mail de verificação'}
                   </button>
                 )}
+              </div>
+            )}
+
+            {isVerifying && (
+              <div className="bg-primary/10 border border-primary/30 text-primary text-sm font-semibold rounded-xl px-4 py-3 flex items-center gap-3 animate-pulse">
+                <span className="material-symbols-outlined !text-xl animate-spin">sync</span>
+                <span>Confirmando seu e-mail...</span>
+              </div>
+            )}
+
+            {verificationStatus?.success && (
+              <div className="bg-success/15 border border-success/40 text-success text-sm font-semibold rounded-xl px-4 py-3 flex items-start gap-3">
+                <span className="material-symbols-outlined !text-xl mt-0.5">verified</span>
+                <span>{verificationStatus.success}</span>
+              </div>
+            )}
+
+            {verificationStatus?.error && (
+              <div className="bg-danger/15 border border-danger/40 text-danger text-sm font-semibold rounded-xl px-4 py-3 flex items-start gap-3">
+                <span className="material-symbols-outlined !text-xl mt-0.5">error</span>
+                <span>{verificationStatus.error}</span>
               </div>
             )}
 

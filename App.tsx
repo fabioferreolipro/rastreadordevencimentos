@@ -42,6 +42,32 @@ export default function App() {
     return PocketBaseService.getAuthState()?.record?.id || '';
   });
 
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<{success?: string, error?: string} | null>(null);
+
+  const handleEmailConfirmation = async (hash: string) => {
+    // PocketBase redireciona com o token no final ou como parâmetro
+    // Exemplo: #/auth/confirm-verification/TOKEN
+    const parts = hash.split('/');
+    const token = parts[parts.length - 1];
+    
+    if (token && token.length > 20) { // Tokens do PB são longos
+      setIsVerifyingEmail(true);
+      try {
+        await PocketBaseService.confirmVerification(token);
+        setVerificationStatus({ success: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
+        setCurrentView('login');
+      } catch (err: any) {
+        setVerificationStatus({ error: err.message || 'Erro ao confirmar e-mail.' });
+        setCurrentView('login');
+      } finally {
+        setIsVerifyingEmail(false);
+        // Limpa o hash da URL
+        window.location.hash = '#login';
+      }
+    }
+  };
+
   const isAuthenticated = Boolean(authToken);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,12 +127,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('confirm-verification')) {
+      handleEmailConfirmation(hash);
+    }
+
     const existing = PocketBaseService.getAuthState();
     if (!existing?.token) return;
     PocketBaseService.authRefresh(existing.token)
       .then((refreshed) => {
         setAuthToken(refreshed.token);
         setAuthUserId(refreshed.record.id);
+        const currentHash = window.location.hash.replace('#', '');
+        if (!currentHash || currentHash === 'login') {
+          setCurrentView('dashboard');
+        }
       })
       .catch(() => {
         PocketBaseService.clearAuthState();
@@ -516,6 +551,8 @@ export default function App() {
             onRegister={handleRegister}
             onForgotPassword={handleForgotPassword}
             onResendVerification={handleResendVerification}
+            isVerifying={isVerifyingEmail}
+            verificationStatus={verificationStatus}
           />
         )}
         
